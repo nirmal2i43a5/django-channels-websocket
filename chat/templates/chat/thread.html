@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block content %}
+<a href="/" class="btn btn-primary">Home</a ><hr>
+<h3>Thread for {% if user != object.first %}{{ object.first }}{% else %}{{ object.second }}{% endif %}</h3>
+<hr>
+<ul id='chat-items'>
+    {% for chat in object.chatmessage_set.all %}
+
+    <strong>{{ chat.user }}::</strong>{{ chat.message }}</li>
+    <!--user is me-->
+    <!--chat.message is sent from browser-->
+    <hr>
+
+    {% endfor %}
+</ul>
+
+<form id='form' method='POST'> {% csrf_token %}
+    <input type="hidden" id="myUsername" value={{user.username}} />
+    <!--above passed user -->
+    <!--I use this to grap admin with its id="myUsername"-->
+    {{form.as_p }}
+    <input type='submit' class='btn btn-primary' />
+
+</form>
+
+{% endblock %}
+
+{% block script %}
+<!-- <script src='https://cdnjs.cloudflare.com/ajax/libs/reconnecting-websocket/1.0.0/reconnecting-websocket.js'> </script> -->
+
+
+
+<script>
+    // websocket scripts
+
+    //console.log(window.location);//I can use this to developed my websocket
+    var formData = $("#form")//grab all the form data
+    var msgInput = $("#id_message")//id_message point for input form.inspect to look this
+
+    var chatHolder = $("#chat-items")
+
+    var me = $("#myUsername").val()//it gives value admin i.e {{user.username}}
+    var loc = window.location
+
+
+    var wsStart = 'ws://' //if i use 'http://' then DOM does not work
+
+    if (loc.protocol == 'https') {
+        wsStart = 'wss://'
+    }
+
+    var endpoint = wsStart + loc.host + loc.pathname;
+    //console.log(endpoint)
+
+
+    var socket = new WebSocket(endpoint)//WebSocket is default in js 
+
+    //var socket = ReconnectingWebSocket(endpoint)
+
+
+
+    //These function are relates to the consumers handlers
+    //--------------------------------------------------
+    //I am receiving msg from consumers.py from myResponse
+    //--------------------------------------------------------
+    socket.onmessage = function (e) {
+        //when user or socket receives messages
+        console.log("message", e);
+        // chatHolder.append(e.data)   //{"message": "This is instant message", "username": "admin"} gives json data
+
+        var chatDataMsg = JSON.parse(e.data)//convert JSOn to js object.here,json data is received from python dumbs
+        //console.log(chatDataMsg)
+        chatHolder.append("<li>" + chatDataMsg.message + " from " + chatDataMsg.username)//consumers.py myResponse data lai grabing
+
+    }
+    //This is the msg that i am sending from put form
+
+    socket.onopen = function (e) {
+        console.log("open", e);
+        formData.submit(function (event) {
+            event.preventDefault()//prevent my form submitted my default
+            var msgText = msgInput.val()//I grab data from input form with using id_message
+            // socket.send(msgText)---sending text data
+
+            //  var formDataSerialized = formData.serialize()
+            //socket.send(formDataSerialized)
+
+            var dicData = {
+                'message': msgText
+            }
+            socket.send(JSON.stringify(dicData))//sending json data===>sending something event from browser form which will consume or receive in consumers.py
+
+            formData[0].reset()//form ma input bhako data form ma show gardaina in form like edit action
+
+        })
+    }
+
+    socket.onerror = function (e) {
+        console.log("error", e);
+
+    }
+
+    socket.onclose = function (e) {
+        console.log("close", e);
+    }
+
+
+</script>
+{% endblock %}
